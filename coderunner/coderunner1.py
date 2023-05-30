@@ -70,3 +70,27 @@ def computeHistogramArbitraryNrBins(pixel_array, image_width, image_height, nr_b
             histogram[bin_index] += 1
 
     return histogram
+
+
+image_width = 4
+image_height = 4
+pixel_array = [[[0,8,16,64],
+            [8,8,32,128],
+            [16,32,128,255],
+            [64,128,255,255]]]
+
+
+
+
+
+
+nr_bins = 16
+histogram = computeHistogramArbitraryNrBins(pixel_array, image_width, image_height, nr_bins)
+print(histogram)
+
+image_width = 1
+image_height = 1
+pixel_array = [ [0] ]
+nr_bins = 1
+histogram = computeHistogramArbitraryNrBins(pixel_array, image_width, image_height, nr_bins)
+print(histogram)

@@ -122,23 +122,145 @@ def scaleTo0And255AndQuantize(pixel_array, image_width, image_height):
         return list(map(lambda x: list(map(lambda y: 0, x)), pixel_array))
     return list(map(lambda x: list(map(lambda y: int(round(((y - min) * 255 / (max - min)),0)), x)), pixel_array))
 
-def computeHistogramArbitraryNrBins(pixel_array, image_width, image_height, nr_bins):
-    '''computes the histogram of the pixel array with arbitrary number of bins'''
-    histogram = [0] * nr_bins
 
-def computeHistogramArbitraryNrBins(pixel_array, image_width, image_height, nr_bins):
-    '''computes the histogram of the pixel array with arbitrary number of bins'''
-    histogram = [0.0] * nr_bins
-    bin_size = round((256/nr_bins),1)
+def computeVerticalEdgesSobelAbsolute(pixel_array, image_width, image_height):
+    '''computes the vertical edges of the pixel array using the Sobel operator'''
+    vertical_edges = createInitializedGreyscalePixelArray(image_width, image_height)
+    sobel_x = [
+                [-1, 0, 1],
+                [-2, 0, 2],
+                [-1, 0, 1]
+            ]
 
     for i in range(image_height):
         for j in range(image_width):
-            bin_index = int(pixel_array[i][j] / bin_size)
-            histogram[bin_index] += 1
 
-    return histogram
+            if i == 0 or i == image_height - 1 or j == 0 or j == image_width - 1:
+                # if we are at the border of the image, we set the value to 0
+                vertical_edges[i][j] = 0.0
 
+            else:
+                # otherwise we apply the Sobel operator
+                            pixel_value = 0.0
+                            for di in range(-1, 2):
+                                for dj in range(-1, 2):
+                                    pixel_value += pixel_array[i+di][j+dj] * sobel_x[di+1][dj+1]
+
+                            vertical_edges[i][j] = abs(pixel_value) / 8
+    return vertical_edges
+
+
+def computeHorizontalEdgesSobelAbsolute(pixel_array, image_width, image_height):
+    sobel_y = [[-1, -2, -1], 
+               [0, 0, 0], 
+               [1, 2, 1]]
+
+    output_image = createInitializedGreyscalePixelArray(image_width, image_height)
+    for i in range(1, image_height-1):
+        for j in range(1, image_width-1):
+            pixel_value = 0.0
+            for di in range(-1, 2): 
+                for dj in range(-1, 2):
+                    pixel_value += pixel_array[i+di][j+dj] * sobel_y[di+1][dj+1]
+            output_image[i][j] = abs(pixel_value)/8
+    return output_image
+
+def computeBoxAveraging3x3(pixel_array, image_width, image_height):
+    output_image = createInitializedGreyscalePixelArray(image_width, image_height)
+
+
+    for i in range(0, image_height):
+        for j in range(0, image_width):
+            if i == 0 or i == image_height - 1 or j == 0 or j == image_width - 1:
+                # if we are at the border of the image, we set the value to 0
+                output_image[i][j] = 0.0
+            else:
+                output_image[i][j] = abs(pixel_array[i + 1][j - 1] + pixel_array[i + 1][j] + pixel_array[i + 1][j + 1] 
+                                        + pixel_array[i][j - 1] + pixel_array[i][j] + pixel_array[i][j + 1] 
+                                        + pixel_array[i - 1][j - 1] + pixel_array[i - 1][j] + pixel_array[i - 1][j + 1]) / 9
+                                     
+    return output_image
+
+
+def computeGaussianAveraging3x3RepeatBorder(pixel_array, image_width, image_height):
+    output_image = createInitializedGreyscalePixelArray(image_width, image_height)
+    gaussian_filter = [
+                        [1, 2, 1],
+                        [2, 4, 2],
+                        [1, 2, 1]
+                    ]
+    for i in range(image_height):
+        for j in range(image_width):
+            pixel_value = 0.0
+            for di in range(-1, 2):
+                for dj in range(-1, 2):
+                    new_x = max(0, min(di + i, image_height - 1))
+                    new_y = max(0, min(dj + j, image_width - 1)) 
+                    pixel_value += pixel_array[new_x][new_y] * gaussian_filter[di+1][dj+1]
+            output_image[i][j] = round((pixel_value *  1/16),2)
+    return output_image
+
+def computeStandardDeviationImage3x3(pixel_array, image_width, image_height):
+    output_image = createInitializedGreyscalePixelArray(image_width, image_height)
+
+    for i in range(1, image_height - 1):
+        for j in range(1, image_width - 1):
+            mean = 0
+            for di in [-1, 0, 1]:
+                for dj in [-1, 0, 1]:
+                    mean += pixel_array[i + di][j + dj]
+            mean /= 9.0
+            variance = 0
+
+            for di in [-1, 0, 1]:
+                for dj in [-1, 0, 1]:
+                    variance += math.pow(pixel_array[i + di][j + dj] - mean, 2)
+
+            variance /= 9.0
+
+            standard = math.sqrt(variance)
+            output_image[i][j] = standard
     
+    return output_image
+
+def computeThresholdGE(pixel_array, threshold_value, image_width, image_height):
+    '''computes the thresholded image'''
+    return list(map(lambda i: list(map(lambda j: 255 if j >= threshold_value else 0, i)), pixel_array))
+
+def computeDilation8Nbh5x5FlatSE(pixel_array, image_width, image_height):
+    output = createInitializedGreyscalePixelArray(image_width, image_height)
+    for i in range(image_height):
+        for j in range(image_width):
+            for di in range(-1, 2):
+                for dj in range(-1, 2):
+                    if 0 <= i+di < image_height and 0 <= j+dj < image_width:
+                        if pixel_array[i + di][j + dj] > 0:
+                            output[i][j] = 1
+                            break
+                if output[i][j] == 1:
+                    break
+    return output
+
+def computeErosion8Nbh5x5FlatSE(pixel_array, image_width, image_height):
+    output = createInitializedGreyscalePixelArray(image_width, image_height)
+    for i in range(image_height):
+        for j in range(image_width):
+            misses = False
+            for di in range(-1, 2):
+                for dj in range(-1, 2):
+                    if 0 <= i+di < image_height and 0 <= j+dj < image_width:
+                        if pixel_array[i+di][j+dj] == 0:
+                            # pixel misses
+                            misses=True
+                            break
+                    else:
+                        misses=True
+                        break
+                if misses:
+                    break
+            if not misses:
+                output[i][j] = 1
+    return output
 
 # This is our code skeleton that performs the barcode detection.
 # Feel free to try it on your own images of barcodes, but keep in mind that with our algorithm developed in this assignment,
@@ -150,7 +272,7 @@ def main():
     SHOW_DEBUG_FIGURES = True
 
     # this is the default input image filename
-    filename = "Barcode2"
+    filename = "Barcode1"
     input_filename = "images/"+filename+".png"
 
     if command_line_arguments != []:
@@ -177,19 +299,55 @@ def main():
     # STUDENT IMPLEMENTATION here
 
     
-
+    #! STEP 1 Convert to grayscale and normolise
     greyscaled = computeRGBToGreyscale(px_array_r, px_array_g, px_array_b, image_width, image_height)
-    streched = streachTo0_255(greyscaled)
+    # quontisise and strech
+    # TODO: test if this helps
+    # greyscaled = scaleTo0And255AndQuantize(greyscaled, image_width, image_height)   
 
-    px_array = streched
+
+    #! STEP 2A apply sobel filter
+    vertical_edges = computeVerticalEdgesSobelAbsolute(greyscaled, image_width, image_height)
+    horizontal_edges = computeHorizontalEdgesSobelAbsolute(greyscaled, image_width, image_height)
+    # combine the two edges by calculating absolute diffrence
+    px_array = [[abs(vertical_edges[i][j] - horizontal_edges[i][j]) for j in range(image_width)] for i in range(image_height)]
+
+    #! STEP 2B apply Standard deviation method
+    # TODO: not currently using standard deviation this, will deside later, if need change abs_dif_edges to std
+    # blurs the image
+    px_array = computeStandardDeviationImage3x3(px_array, image_width, image_height)
+
+
+    #! STEP 3 apply Gaussian filter
+    #!! this takes ages!! 
+    for i in range(4):
+        px_array = computeGaussianAveraging3x3RepeatBorder(px_array, image_width, image_height)
+
+    contrast_strech = streachTo0_255(px_array)
+
+
+    #! STEP 4 apply thresholding
+    px_array = computeThresholdGE(px_array, 100, image_width, image_height)
+
+
+    #! STEP 5a apply dilation
+    for _ in range(3):
+        px_array = computeDilation8Nbh5x5FlatSE(px_array, image_width, image_height)
+
+    #! STEP 5b apply erosion
+    for _ in range(2):
+        px_array = computeErosion8Nbh5x5FlatSE(px_array, image_width, image_height)
+    
 
     fig1, axs1 = pyplot.subplots(2, 2)
-    axs1[0, 0].set_title('Input red channel of image')
-    axs1[0, 0].imshow(px_array_r, cmap='gray')
-    axs1[0, 1].set_title('streched')
-    axs1[0, 1].imshow(streched, cmap='gray')
-    axs1[1, 0].set_title('greyscaled')
-    axs1[1, 0].imshow(greyscaled, cmap='gray')
+    axs1[0, 0].set_title('px array')
+    axs1[0, 0].imshow(px_array, cmap='gray')
+
+    axs1[0, 1].set_title('threshold')
+    axs1[0, 1].imshow(px_array, cmap='gray')
+
+    axs1[1, 0].set_title('strech')
+    axs1[1, 0].imshow(contrast_strech, cmap='gray')
     # Compute a dummy bounding box centered in the middle of the input image, and with as size of half of width and height
     # Change these values based on the detected barcode region from your algorithm
     center_x = image_width / 2.0
