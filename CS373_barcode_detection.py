@@ -490,7 +490,7 @@ def main():
     #! pick largest component from dict
     largest = 0
     for key in label_dict.keys():
-        LOG(f"component {key} has {label_dict[key][0]} pixels")
+        # LOG(f"component {key} has {label_dict[key][0]} pixels")
         if label_dict[key][0] > largest:
             largest = label_dict[key][0]
             largest_key = key
@@ -500,7 +500,7 @@ def main():
     #! find bounding box
     start_x,start_y,height,width = computeBoundBox(px_array, label_dict, image_width, image_height,largest_key)
     bbox_min_x, bbox_max_x, bbox_min_y, bbox_max_y = start_x, start_x + height, start_y, start_y + width
-    LOG(f"bounding box -- x_min = {bbox_min_x}, x_max = {bbox_max_x}, y_min = {bbox_min_y}, y_max = {bbox_max_y}")
+    LOG(f"x_min = {bbox_min_x}, x_max = {bbox_max_x}, y_min = {bbox_min_y}, y_max = {bbox_max_y}")
     
 
     fig1, axs1 = pyplot.subplots(2, 2)
@@ -528,10 +528,8 @@ def main():
     #! The following code is used to plot the bounding box and generate an output for marking
 
     # convert the greyscale pixel array to a 3-channel RGB array
-    coloured_img = separateArraysToRGB(px_array_r, px_array_g, px_array_b, image_width, image_height)
-
     axs1[1, 1].set_title('Final image of detection')
-    axs1[1, 1].imshow(coloured_img)
+    axs1[1, 1].imshow(separateArraysToRGB(px_array_r, px_array_g, px_array_b, image_width, image_height))
 
     # Draw a bounding box as a rectangle into the input image
     rect = Rectangle((bbox_min_x, bbox_min_y), bbox_max_x - bbox_min_x, bbox_max_y - bbox_min_y, linewidth=1,
