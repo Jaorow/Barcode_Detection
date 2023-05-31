@@ -72,7 +72,7 @@ def computeErosion8Nbh3x3FlatSE(pixel_array, image_width, image_height):
 
 
 def computeConnectedComponentLabeling(pixel_array, image_width, image_height):
-    neighborhood = [(0, -1), (-1, 0), (1, 0), (0, 1)]
+    map = [(0, -1), (-1, 0), (1, 0), (0, 1)]
 
     # initialise label counter and dictionary to keep track of label sizes
     c = 1
@@ -95,9 +95,20 @@ def computeConnectedComponentLabeling(pixel_array, image_width, image_height):
                     if visited[x][y] == 0:
                         visited[x][y],labeled_image[x][y] = 1,c
 
-                        label_dict[c] = label_dict.get(c,0) + 1
+                        dic = label_dict.get(c,None)
+                        if dic == None:
+                            label_dict[c] = [1, x, x, y, y]
+                            
+                        else:
+                            dic = label_dict[c]
+                            x_min = min(dic[1], x)
+                            x_max = max(dic[2], x)
+                            y_min = min(dic[3], y)
+                            y_max = max(dic[4], y)
+                            count = dic[0] + 1
+                            label_dict[c] = [count, x_min, x_max, y_min, y_max]
 
-                        for dx, dy in neighborhood:
+                        for dx, dy in map:
 
                             if 0 <= x+dx < image_height and 0 <= y+dy < image_width:
                                 if pixel_array[x+dx][y+dy] > 0 and visited[x+dx][y+dy] == 0:
@@ -130,12 +141,6 @@ pixel_array = [
         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]
 (ccimg,ccsizes) = computeConnectedComponentLabeling(pixel_array,image_width,image_height)
 
-if type(ccsizes) == dict and len(ccsizes) > 0:
-    print(ccimg, "C", len(ccsizes)+1)
-else:
-    print("Failed to format output array as HTML")
-    print(ccimg)
+# {1: 19, 2: 59}
 
-print("label: nr_pixels")
-for sz in ccsizes.keys():
-    print("{}: {}".format(sz, ccsizes[sz]))
+print(ccsizes)

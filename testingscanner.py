@@ -404,7 +404,7 @@ def main():
     SHOW_DEBUG_FIGURES = True
 
     # this is the default input image filename
-    filename = "Barcode5"
+    filename = "Barcode1"
     input_filename = "images/"+filename+".png"
 
     if command_line_arguments != []:
@@ -477,7 +477,7 @@ def main():
 
     #! STEP 5a apply dilation
     for _ in range(5):
-        LOG(f"dilation step {_+1} of 5 applyed")
+        LOG(f"dilation step {_+1} of 3 applyed")
         dia = computeDilation8Nbh5x5FlatSE(dia, image_width, image_height)    
 
     #! STEP 6 conected component analysis
@@ -511,9 +511,9 @@ def main():
     for i in range(image_height):
         for j in range(image_width):
             if px_array[i][j] != largest_key:
-                largest_component[i][j] = 254
-            else:
                 largest_component[i][j] = 255
+            else:
+                largest_component[i][j] = 0
 
     # Show the largest component
     axs1[0, 1].set_title('largest component')
@@ -521,7 +521,7 @@ def main():
 
     # Show the edges
     axs1[1, 0].set_title('edges')
-    axs1[1, 0].imshow(px_array, cmap='gray')
+    axs1[1, 0].imshow(contrast_strech, cmap='gray')
 
 
 
