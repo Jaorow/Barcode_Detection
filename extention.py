@@ -1,9 +1,16 @@
 # Built in packages
 import math
+import os
 import sys
 from pathlib import Path
 import time
 
+import json
+import requests
+
+from pyzbar import pyzbar
+from PIL import Image
+from dotenv import load_dotenv
 
 # Matplotlib will need to be installed if it isn't already. This is the only package allowed for this base part of the 
 # assignment.
@@ -12,6 +19,7 @@ from matplotlib.patches import Rectangle
 
 # import our basic, light-weight png reader library
 import imageIO.png
+
 
 class Queue:
     def __init__(self):
@@ -113,10 +121,6 @@ def computeCumulativeHistogram(pixel_array, image_width, image_height, nr_bins):
     for i in range(len(cumulative_histogram)):
         cumulative_histogram[i] = cumulative_histogram[i - 1] + histogram[i]
     return cumulative_histogram
-
-def computeThresholdGE(pixel_array, threshold_value, image_width, image_height):
-    '''computes the thresholded image'''
-    return list(map(lambda x: list(map(lambda y: 255 if y >= threshold_value else 0, x)), pixel_array))
 
 
 def computeRGBToGreyscale(pixel_array_r, pixel_array_g, pixel_array_b, image_width, image_height):
@@ -360,8 +364,6 @@ def filter_aspect_ratio(label_dict):
 
     return label_dict
 
-
-
 def computeBoundBox(labeled_img,labeled_dict,image_width,image_height,largest_component_key):
 
     output_array = createInitializedGreyscalePixelArray(image_width, image_height)
@@ -379,6 +381,12 @@ def computeBoundBox(labeled_img,labeled_dict,image_width,image_height,largest_co
 
     return min(x_values), min(y_values), max(x_values) - min(x_values), max(y_values) - min(y_values)
 
+def crop_pixle_array(x_max,x_min,y_max,y_min,pixel_array):
+    cropped_array = createInitializedGreyscalePixelArray(x_max-x_min, y_max-y_min)
+    for i in range(y_min, y_max):
+        for j in range(x_min, x_max):
+            cropped_array[i-y_min][j-x_min] = pixel_array[i][j]
+    return cropped_array
 
 def separateArraysToRGB(px_array_r, px_array_g, px_array_b, image_width, image_height):
     new_array = [[[0 for c in range(3)] for x in range(image_width)] for y in range(image_height)]
@@ -391,6 +399,55 @@ def separateArraysToRGB(px_array_r, px_array_g, px_array_b, image_width, image_h
 
     return new_array
 
+
+def calc_sobel(greyscaled, image_width, image_height):
+    vertical_edges = computeVerticalEdgesSobelAbsolute(greyscaled, image_width, image_height)
+    horizontal_edges = computeHorizontalEdgesSobelAbsolute(greyscaled, image_width, image_height)
+    # combine the two edges by calculating absolute diffrence
+    px_array = [[abs(vertical_edges[i][j] - horizontal_edges[i][j]) for j in range(image_width)] for i in range(image_height)]
+    return px_array
+
+
+
+def call_api(code):
+    # get api key from env file
+    key = os.getenv('API_Key')
+    
+    url = f"https://product-lookup-by-upc-or-ean.p.rapidapi.com/code/{code}"
+
+    headers = {
+        "X-RapidAPI-Key": key,
+        "X-RapidAPI-Host": "product-lookup-by-upc-or-ean.p.rapidapi.com"
+    }
+
+    response = requests.get(url, headers=headers)
+    json_data = json.loads(response.text)
+    print(response.json())
+    # get attribute from repsonce at product then name
+    try:
+        return "\n" + json_data.get("product").get("name")
+    except:
+        return ""
+
+
+def decode_barcode(px_array):
+    # decodes all barcodes from an image
+    image = Image.new('L', (len(px_array[0]), len(px_array)))
+    for y in range(len(px_array)):
+        for x in range(len(px_array[y])):
+            image.putpixel((x, y), px_array[y][x])
+
+    return str(pyzbar.decode(image)[0][0])[2:-1]
+
+
+
+
+
+
+
+
+
+
 # This is our code skeleton that performs the barcode detection.
 # Feel free to try it on your own images of barcodes, but keep in mind that with our algorithm developed in this assignment,
 # we won't detect arbitrary or difficult to detect barcodes!
@@ -398,13 +455,14 @@ def main():
     # find current time for performance evaluation/logging
     global start_time 
     start_time = time.time()
+    load_dotenv()
 
     command_line_arguments = sys.argv[1:]
 
     SHOW_DEBUG_FIGURES = True
 
     # this is the default input image filename
-    filename = "Barcode1"
+    filename = "Barcode5"
     input_filename = "images/"+filename+".png"
 
     if command_line_arguments != []:
@@ -477,7 +535,7 @@ def main():
 
     #! STEP 5a apply dilation
     for _ in range(5):
-        LOG(f"dilation step {_+1} of 3 applyed")
+        LOG(f"dilation step {_+1} of 5 applyed")
         dia = computeDilation8Nbh5x5FlatSE(dia, image_width, image_height)    
 
     #! STEP 6 conected component analysis
@@ -490,7 +548,7 @@ def main():
     #! pick largest component from dict
     largest = 0
     for key in label_dict.keys():
-        LOG(f"component {key} has {label_dict[key][0]} pixels")
+        # LOG(f"component {key} has {label_dict[key][0]} pixels")
         if label_dict[key][0] > largest:
             largest = label_dict[key][0]
             largest_key = key
@@ -500,7 +558,21 @@ def main():
     #! find bounding box
     start_x,start_y,height,width = computeBoundBox(px_array, label_dict, image_width, image_height,largest_key)
     bbox_min_x, bbox_max_x, bbox_min_y, bbox_max_y = start_x, start_x + height, start_y, start_y + width
-    LOG(f"bounding box -- x_min = {bbox_min_x}, x_max = {bbox_max_x}, y_min = {bbox_min_y}, y_max = {bbox_max_y}")
+    LOG(f"x_min = {bbox_min_x}, x_max = {bbox_max_x}, y_min = {bbox_min_y}, y_max = {bbox_max_y}")
+    
+    # ! add colour back into array
+    coloured_array = separateArraysToRGB(px_array_r, px_array_g, px_array_b, image_width, image_height)
+
+    # ! crop the original image
+    xpad = 0
+    ypad = 0
+    cropped_px_array = crop_pixle_array(bbox_max_x+xpad, bbox_min_x-xpad, bbox_max_y+ypad, bbox_min_y-ypad, greyscaled)
+    LOG("cropped image with padding {pad} applyed}")
+
+    # ! take the cropped image and pass it into a barcode scanner
+    barcode_number = decode_barcode(cropped_px_array)
+    predicted_product = call_api(barcode_number)
+
     
 
     fig1, axs1 = pyplot.subplots(2, 2)
@@ -511,31 +583,31 @@ def main():
     for i in range(image_height):
         for j in range(image_width):
             if px_array[i][j] != largest_key:
-                largest_component[i][j] = 255
+                largest_component[i][j] = 254
             else:
-                largest_component[i][j] = 0
+                largest_component[i][j] = 255
 
     # Show the largest component
     axs1[0, 1].set_title('largest component')
     axs1[0, 1].imshow(largest_component, cmap='gray')
 
     # Show the edges
-    axs1[1, 0].set_title('edges')
-    axs1[1, 0].imshow(contrast_strech, cmap='gray')
+    axs1[1, 0].set_title('crop')
+    axs1[1, 0].imshow(cropped_px_array, cmap='gray')
 
 
 
     #! The following code is used to plot the bounding box and generate an output for marking
 
     # convert the greyscale pixel array to a 3-channel RGB array
-    coloured_img = separateArraysToRGB(px_array_r, px_array_g, px_array_b, image_width, image_height)
-
     axs1[1, 1].set_title('Final image of detection')
-    axs1[1, 1].imshow(coloured_img)
+    axs1[1, 1].imshow(coloured_array)
 
     # Draw a bounding box as a rectangle into the input image
     rect = Rectangle((bbox_min_x, bbox_min_y), bbox_max_x - bbox_min_x, bbox_max_y - bbox_min_y, linewidth=1,
                      edgecolor='g', facecolor='none')
+    
+    pyplot.text(bbox_min_x, bbox_max_y+40, f"{barcode_number}{predicted_product}", fontsize=7, color="red", bbox=dict(facecolor='white', alpha=0.8, edgecolor='red', pad=2))    
     axs1[1, 1].add_patch(rect)
 
     # write the output image into output_filename, using the matplotlib savefig method
@@ -545,7 +617,6 @@ def main():
     if SHOW_DEBUG_FIGURES:
         # plot the current figure
         pyplot.show()
-
 
 if __name__ == "__main__":
     main()

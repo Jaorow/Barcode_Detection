@@ -114,10 +114,6 @@ def computeCumulativeHistogram(pixel_array, image_width, image_height, nr_bins):
         cumulative_histogram[i] = cumulative_histogram[i - 1] + histogram[i]
     return cumulative_histogram
 
-def computeThresholdGE(pixel_array, threshold_value, image_width, image_height):
-    '''computes the thresholded image'''
-    return list(map(lambda x: list(map(lambda y: 255 if y >= threshold_value else 0, x)), pixel_array))
-
 
 def computeRGBToGreyscale(pixel_array_r, pixel_array_g, pixel_array_b, image_width, image_height):
     '''computes given RGB Arrays to greyscale array'''
