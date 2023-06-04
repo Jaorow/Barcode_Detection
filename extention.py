@@ -412,7 +412,7 @@ def calc_sobel(greyscaled, image_width, image_height):
 def call_api(code):
     # get api key from env file
     key = os.getenv('API_Key')
-    
+
     url = f"https://product-lookup-by-upc-or-ean.p.rapidapi.com/code/{code}"
 
     headers = {
@@ -462,7 +462,7 @@ def main():
     SHOW_DEBUG_FIGURES = True
 
     # this is the default input image filename
-    filename = "Barcode5"
+    filename = "Barcode6"
     input_filename = "images/"+filename+".png"
 
     if command_line_arguments != []:
@@ -570,10 +570,16 @@ def main():
     LOG("cropped image with padding {pad} applyed}")
 
     # ! take the cropped image and pass it into a barcode scanner
-    barcode_number = decode_barcode(cropped_px_array)
-    predicted_product = call_api(barcode_number)
-
-    
+    try:
+        barcode_number = decode_barcode(cropped_px_array)
+        predicted_product = call_api(barcode_number)
+    except:
+        try:
+            barcode_number = decode_barcode(greyscaled)
+            predicted_product = call_api(barcode_number)
+        except:
+            barcode_number = "error in reading barcode..."
+            predicted_product = ""
 
     fig1, axs1 = pyplot.subplots(2, 2)
     axs1[0, 0].set_title('thresholded image')

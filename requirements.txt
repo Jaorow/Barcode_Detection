@@ -1,2 +1,4 @@
 matplotlib
-pyzbar-0.1.9
+pyzbar
+requests
+python-dotenv
