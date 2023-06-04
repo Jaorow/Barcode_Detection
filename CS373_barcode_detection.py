@@ -432,7 +432,6 @@ def main():
     greyscaled = computeRGBToGreyscale(px_array_r, px_array_g, px_array_b, image_width, image_height)
     LOG(f"image grayscaled")
     # quontisise and strech
-    # TODO: test if this helps
     # greyscaled = scaleTo0And255AndQuantize(greyscaled, image_width, image_height)   
 
 
@@ -444,8 +443,6 @@ def main():
     LOG(f"soble filter applyed")
 
     #! STEP 2B apply Standard deviation method
-    # TODO: currently using standard deviation, will deside later, if need change abs_dif_edges to std
-    # blurs the image
     # px_array = computeStandardDeviationImage3x3(px_array, image_width, image_height)
     # LOG("standard deviation applyed")
 

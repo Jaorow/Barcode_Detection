@@ -84,8 +84,14 @@ def createInitializedGreyscalePixelArray(image_width, image_height, initValue = 
     return new_array
 
 # You can add your own functions here:
-def LOG(message):
-    print(f"LOGGING INFO-[{round(time.time()-start_time,2)}]: {message}")
+def LOG(message, important=False):
+    if important:
+        print(message)
+
+    if SHOW_DEBUG_FIGURES and not important:
+        print(f"LOGGING INFO-[{round(time.time()-start_time,2)}]: {message}")
+    else:
+        pass
 
 def streachTo0_255(px_array):
     '''streaches the greyscale pixel array to 0-255'''
@@ -364,6 +370,8 @@ def filter_aspect_ratio(label_dict):
 
     return label_dict
 
+
+
 def computeBoundBox(labeled_img,labeled_dict,image_width,image_height,largest_component_key):
 
     output_array = createInitializedGreyscalePixelArray(image_width, image_height)
@@ -380,6 +388,8 @@ def computeBoundBox(labeled_img,labeled_dict,image_width,image_height,largest_co
                     x_values.add(j)
 
     return min(x_values), min(y_values), max(x_values) - min(x_values), max(y_values) - min(y_values)
+
+
 
 def crop_pixle_array(x_max,x_min,y_max,y_min,pixel_array):
     cropped_array = createInitializedGreyscalePixelArray(x_max-x_min, y_max-y_min)
@@ -411,23 +421,29 @@ def calc_sobel(greyscaled, image_width, image_height):
 
 def call_api(code):
     # get api key from env file
-    key = os.getenv('API_Key')
+    if SHOW_DEBUG_FIGURES:
+        LOG(f"SHOWING DEBUG FIGURES SO FAKE API CALL are returned")
+        return "SPLOOF RETURN"
+    
+    else:
 
-    url = f"https://product-lookup-by-upc-or-ean.p.rapidapi.com/code/{code}"
+        url = f"https://product-lookup-by-upc-or-ean.p.rapidapi.com/code/{code}"
 
-    headers = {
-        "X-RapidAPI-Key": key,
-        "X-RapidAPI-Host": "product-lookup-by-upc-or-ean.p.rapidapi.com"
-    }
+        headers = {
+            "X-RapidAPI-Key": os.getenv('API_Key'),
+            "X-RapidAPI-Host": "product-lookup-by-upc-or-ean.p.rapidapi.com"
+        }
 
-    response = requests.get(url, headers=headers)
-    json_data = json.loads(response.text)
-    print(response.json())
-    # get attribute from repsonce at product then name
-    try:
-        return "\n" + json_data.get("product").get("name")
-    except:
-        return ""
+        LOG("CALLING API")
+        response = requests.get(url, headers=headers)
+        json_data = json.loads(response.text)
+
+        LOG(response.json())
+        # get attribute from repsonce at product then name
+        try:
+            return json_data.get("product").get("name")
+        except:
+            return ""
 
 
 def decode_barcode(px_array):
@@ -438,14 +454,6 @@ def decode_barcode(px_array):
             image.putpixel((x, y), px_array[y][x])
 
     return str(pyzbar.decode(image)[0][0])[2:-1]
-
-
-
-
-
-
-
-
 
 
 # This is our code skeleton that performs the barcode detection.
@@ -459,10 +467,11 @@ def main():
 
     command_line_arguments = sys.argv[1:]
 
+    global SHOW_DEBUG_FIGURES 
     SHOW_DEBUG_FIGURES = True
 
     # this is the default input image filename
-    filename = "Barcode6"
+    filename = "Barcode1"
     input_filename = "images/"+filename+".png"
 
     if command_line_arguments != []:
@@ -494,7 +503,6 @@ def main():
     greyscaled = computeRGBToGreyscale(px_array_r, px_array_g, px_array_b, image_width, image_height)
     LOG(f"image grayscaled")
     # quontisise and strech
-    # TODO: test if this helps
     # greyscaled = scaleTo0And255AndQuantize(greyscaled, image_width, image_height)   
 
 
@@ -506,8 +514,6 @@ def main():
     LOG(f"soble filter applyed")
 
     #! STEP 2B apply Standard deviation method
-    # TODO: currently using standard deviation, will deside later, if need change abs_dif_edges to std
-    # blurs the image
     # px_array = computeStandardDeviationImage3x3(px_array, image_width, image_height)
     # LOG("standard deviation applyed")
 
@@ -563,28 +569,32 @@ def main():
     # ! add colour back into array
     coloured_array = separateArraysToRGB(px_array_r, px_array_g, px_array_b, image_width, image_height)
 
-    # ! crop the original image
-    xpad = 0
-    ypad = 0
+    #! crop the original image
+    xpad = 20
+    ypad = 20
     cropped_px_array = crop_pixle_array(bbox_max_x+xpad, bbox_min_x-xpad, bbox_max_y+ypad, bbox_min_y-ypad, greyscaled)
-    LOG("cropped image with padding {pad} applyed}")
+    LOG(f"cropped image with padding x={xpad}, y={ypad} applyed")
 
-    # ! take the cropped image and pass it into a barcode scanner
+    #! take the cropped image and pass it into a barcode scanner and make an api call to get name of product
     try:
         barcode_number = decode_barcode(cropped_px_array)
         predicted_product = call_api(barcode_number)
+        LOG(f"Barcode number {barcode_number}, predicted_product {predicted_product.strip()}")
+
     except:
+        LOG("Error reading cropped barcode... trying whole image")
+
         try:
             barcode_number = decode_barcode(greyscaled)
             predicted_product = call_api(barcode_number)
+            LOG(f"Barcode number {barcode_number}, predicted_product {predicted_product.strip()}")
+
         except:
+            LOG("error reading barcode... defulting")
             barcode_number = "error in reading barcode..."
             predicted_product = ""
 
-    fig1, axs1 = pyplot.subplots(2, 2)
-    axs1[0, 0].set_title('thresholded image')
-    axs1[0, 0].imshow(threshold, cmap='gray')
-
+    #! compute the largest component
     largest_component = createInitializedGreyscalePixelArray(image_width, image_height)
     for i in range(image_height):
         for j in range(image_width):
@@ -592,6 +602,11 @@ def main():
                 largest_component[i][j] = 254
             else:
                 largest_component[i][j] = 255
+
+
+    fig1, axs1 = pyplot.subplots(2, 2)
+    axs1[0, 0].set_title('thresholded image')
+    axs1[0, 0].imshow(threshold, cmap='gray')
 
     # Show the largest component
     axs1[0, 1].set_title('largest component')
@@ -602,23 +617,30 @@ def main():
     axs1[1, 0].imshow(cropped_px_array, cmap='gray')
 
 
-
-    #! The following code is used to plot the bounding box and generate an output for marking
-
     # convert the greyscale pixel array to a 3-channel RGB array
     axs1[1, 1].set_title('Final image of detection')
     axs1[1, 1].imshow(coloured_array)
 
+    #! The following code is used to plot the bounding box and generate an output for marking
     # Draw a bounding box as a rectangle into the input image
     rect = Rectangle((bbox_min_x, bbox_min_y), bbox_max_x - bbox_min_x, bbox_max_y - bbox_min_y, linewidth=1,
                      edgecolor='g', facecolor='none')
     
-    pyplot.text(bbox_min_x, bbox_max_y+40, f"{barcode_number}{predicted_product}", fontsize=7, color="red", bbox=dict(facecolor='white', alpha=0.8, edgecolor='red', pad=2))    
+    pyplot.text(bbox_min_x, bbox_max_y+40, f"{barcode_number}\n{predicted_product}", fontsize=7, color="red", bbox=dict(facecolor='white', alpha=0.8, edgecolor='red', pad=2))    
     axs1[1, 1].add_patch(rect)
 
     # write the output image into output_filename, using the matplotlib savefig method
     extent = axs1[1, 1].get_window_extent().transformed(fig1.dpi_scale_trans.inverted())
     pyplot.savefig(output_filename, bbox_inches=extent, dpi=600)
+
+    LOG(f'''
+        \n\n\n
+        Computing finished in {time.time() - start_time} seconds
+        Largest connected component = KEY[{largest_key}], SIZE[{largest}]
+
+        Barcode = {barcode_number if barcode_number != "error in reading barcode..." else "No barcode could be scanned"}
+        Product = {predicted_product.strip() if predicted_product != '' else "no product was found"}
+        ''', important = True)
 
     if SHOW_DEBUG_FIGURES:
         # plot the current figure
